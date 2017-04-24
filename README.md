@@ -1,4 +1,5 @@
 ### 1.jsonml-to-react-component
+首先判断是否满足converters中第一个判断条件，如果满足条件我们才会通过第二个函数进行jsonml处理
 ```js
 'use strict';
 
@@ -66,3 +67,16 @@ module.exports = function toReactComponent(jsonml, converters = []) {
   return utils.cond(jsonml, mergeConverters, cid++);
 };
 ```
+
+### 2.converters的顺序问题
+```js
+exports.cond = function cond(data, conds, index) {
+  const pair = conds.filter((converter) => {
+    return converter[0](data);
+    //如果返回true，那么表示这个converter应该是可以处理的，满足被处理的条件
+  })[0];
+  return pair[1](data, index);
+};
+```
+对converters进行筛选，我们的defaultConverters在最后面，`如果前面有converters
+已经满足条件，那么后续的converter不再进行处理`。

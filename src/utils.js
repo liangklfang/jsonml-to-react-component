@@ -27,7 +27,8 @@ exports.assign = function assign(target, source) {
   }
   return target;
 };
-//对converters进行筛选
+//对converters进行筛选，我们的defaultConverters在最后面，如果前面有converters
+//已经满足条件，那么后续的converter不再进行处理
 exports.cond = function cond(data, conds, index) {
   const pair = conds.filter((converter) => {
     return converter[0](data);
