@@ -1,94 +1,68 @@
-# jsonml-to-react-component
-
-[![](https://img.shields.io/travis/benjycui/jsonml-to-react-component.svg?style=flat-square)](https://travis-ci.org/benjycui/jsonml-to-react-component)
-[![npm package](https://img.shields.io/npm/v/jsonml-to-react-component.svg?style=flat-square)](https://www.npmjs.org/package/jsonml-to-react-component)
-[![NPM downloads](http://img.shields.io/npm/dm/jsonml-to-react-component.svg?style=flat-square)](https://npmjs.org/package/jsonml-to-react-component)
-[![Dependency Status](https://david-dm.org/benjycui/jsonml-to-react-component.svg?style=flat-square)](https://david-dm.org/benjycui/jsonml-to-react-component)
-
-To convert JsonML to React Component.
-
-## Installation
-
-```bash
-npm install --save jsonml-to-react-component
-```
-
-## Usage
-
-Basic:
-
+### 1.jsonml-to-react-component
 ```js
-const ReactDOM = require('react-dom');
-const toReactComponent = require('jsonml-to-react-component');
+'use strict';
 
-const title = [
-  'h1',
-  'Hello world!',
-];
-
-ReactDOM.render(toReactComponent(title), document.getElementById('content'));
-```
-
-With converters:
-
-```js
 const React = require('react');
-const ReactDOM = require('react-dom');
-const toReactComponent = require('jsonml-to-react-component');
+const JsonML = require('jsonml.js/lib/utils');
+const utils = require('./utils');
 
-const website = [
-  'section',
-  [
-    'header',
-    ...
-  ],
-  [
-    'article',
-    [
-      'h1',
-      'Hello world!',
-    ],
-  ],
-  [
-    'footer',
-    ...
-  ]
-];
+let cid = 0;
+module.exports = function toReactComponent(jsonml, converters = []) {
+  //默认的jsonml的converters
+  const defaultConverters = [
+    [(node) => JsonML.getTagName(node) === 'style', (node, index) => {
+      const tagName = JsonML.getTagName(node);
+      const attrs = JsonML.getAttributes(node);
+      const styles = JsonML.getChildren(node)[0];
+      return React.createElement(tagName, utils.assign({
+        key: index,
+        //这个key就是每一个react组件必须有的key
+        dangerouslySetInnerHTML: {
+          __html: styles,
+          //创建style标签，同时将style中的css/less内容作为创建的React的style的Element的内容
+        },
+      }, attrs));
+    }],
+    [(node) => typeof node === 'string', (node) => node],
+    //如果这个node是"string"那么原样返回
+    [() => true, (node, index) => {
+      const attrs = utils.assign({ key: index }, JsonML.getAttributes(node));
+      //其他的node都是做这样的处理
+      if (attrs.class) {
+        attrs.className = attrs.class;
+        delete attrs.class;
+      }
+      //将class属性转化为className
+      if (attrs.style) {
+        attrs.style = utils.toStyleObject(attrs.style);
+      }
+      //将style的string转化为字符串对象，而不是字符串
+      const tagName = JsonML.getTagName(node);
+      return React.createElement(
+        tagName,
+        attrs,
+        utils.isStandalone(tagName) ?
+          undefined :
+          //tagName === 'hr' || tagName === 'br' || tagName === 'img'
+          JsonML.getChildren(node).map(innerToReactComponent)
+          //对每一个子元素都会进行处理的~~
+      );
+    }],
+  ];
 
-const html5to4 = [
-  [
-    (node) => ['section', 'header', 'article', 'footer'].indexOf(node[0]) > -1,
-    (node, index) => React.createElement(
-      'div',
-      { key: index },
-      node.slice(1).map((child) => toReactComponent(child, html5to4))
-    )
-  ],
-  ...
-];
-
-ReactDOM.render(
-  toReactComponent(website, html5to4),
-  document.getElementById('content')
-);
+  const mergeConverters = converters.concat(defaultConverters);
+// exports.cond = function cond(data, conds, index) {
+//   const pair = conds.filter((converter) => {
+//     return converter[0](data);
+//   })[0];
+//   return pair[1](data, index);
+// };
+// The first function is a prediction, and the second function is a 
+// processor which take JsonML node and return React Component.
+// 首先根据converters[0]也就是第一个函数进行筛选，筛选通过了才会进行jsonml的处理操作
+  function innerToReactComponent(jsonml, index) {
+    return utils.cond(jsonml, mergeConverters, index);
+  }
+  return utils.cond(jsonml, mergeConverters, cid++);
+};
 ```
-
-## API
-
-### toReactComponent(jsonml: Object [, converters: Array]): React.Component
-
-To convert JsonML to React Component with converters.
-
-#### converters: Array[Pair[Function, Function]]
-
-Converters which are passed to `toReactComponent` will concat with [default converters](https://github.com/benjycui/jsonml-to-react-component/blob/master/src/index.js#L47). It works like `switch` sentence.
-
-Each item in converters is a pair of functions. The first function is a prediction, and the second function is a processor which take JsonML node and return React Component.
-
-## Relative
-
-[jsonml.js](https://github.com/benjycui/jsonml.js) A collection of JsonML tools.
-
-## Liscence
-
-MIT
